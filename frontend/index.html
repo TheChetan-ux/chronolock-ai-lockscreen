@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChronoLock — AI Countdown Lock Screen Architect</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <strong>ChronoLock</strong>
+      <span class="badge" id="apiStatusBadge">Checking AI...</span>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-ghost" id="newDesignBtn" hidden>+ Create New</button>
+      <button type="button" class="btn btn-secondary" id="copyShareBtn" hidden>Copy Share URL</button>
+      <button type="button" class="btn btn-primary" id="saveShareBtn">Publish Share Link</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- Left Studio Controls -->
+    <section class="panel controls-panel" aria-label="Lock Screen Controls">
+      <div id="sharedBanner" class="shared-banner" hidden>
+        <span id="sharedBannerText">Viewing published lock screen.</span>
+      </div>
+
+      <div class="field-group">
+        <label for="titleInput">Deadline Title</label>
+        <input
+          id="titleInput"
+          type="text"
+          maxlength="60"
+          placeholder="e.g., SEBI Grade A IT Phase 1"
+          value="SEBI Grade A IT — Phase 1"
+        />
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="targetDateInput">Target Date & Time</label>
+          <input id="targetDateInput" type="datetime-local" />
+        </div>
+        <div class="field-group">
+          <label for="deviceSelect">Screen Format</label>
+          <select id="deviceSelect">
+            <option value="mobile">Phone (1080×2400)</option>
+            <option value="desktop">Desktop (2560×1440)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label for="contextInput">Focus Context (for Gemini AI)</label>
+        <textarea
+          id="contextInput"
+          rows="2"
+          maxlength="260"
+          placeholder="Key subjects, sprint goals, or daily deliverables..."
+        >Daily DSA, networking protocols, full-length mock tests, and formula revision</textarea>
+      </div>
+
+      <button type="button" class="btn btn-ai" id="generateAiBtn">
+        ✦ Generate Backward Milestones with Gemini
+      </button>
+
+      <div class="divider"></div>
+
+      <div class="section-head">
+        <span>Chronological Milestones (Click to Check Off)</span>
+        <button type="button" class="btn-link" id="addMilestoneBtn">+ Add</button>
+      </div>
+      <div id="milestonesList" class="milestones-list"></div>
+
+      <div class="field-group">
+        <label for="mantraInput">Lock Screen Micro-Mantra</label>
+        <input
+          id="mantraInput"
+          type="text"
+          maxlength="75"
+          value="Small daily blocks compound into completion."
+        />
+      </div>
+
+      <div class="field-group">
+        <label>Aesthetic Theme</label>
+        <div class="theme-pills" id="themePills">
+          <button type="button" class="theme-pill active" data-theme="obsidian-gold">Obsidian Gold</button>
+          <button type="button" class="theme-pill" data-theme="nordic-paper">Nordic Paper</button>
+          <button type="button" class="theme-pill" data-theme="cyber-emerald">Cyber Emerald</button>
+          <button type="button" class="theme-pill" data-theme="sunset-terracotta">Terracotta</button>
+          <button type="button" class="theme-pill" data-theme="deep-cobalt">Deep Cobalt</button>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label class="switch-label" for="overlayToggle">
+          <input type="checkbox" id="overlayToggle" checked />
+          <span>Simulate OS Lock Screen Clock Safe-Zone</span>
+        </label>
+      </div>
+
+      <div class="export-grid">
+        <button type="button" class="btn btn-primary" id="downloadWallpaperBtn">
+          ↓ Download Lock Screen PNG
+        </button>
+        <button type="button" class="btn btn-secondary" id="downloadCoverBtn">
+          ↓ Export 16:9 Cover Image
+        </button>
+      </div>
+
+      <p class="status-msg" id="statusMsg" role="status"></p>
+    </section>
+
+    <!-- Right Live HiDPI Lock Screen Preview -->
+    <section class="panel preview-panel" aria-label="Live Lock Screen Preview">
+      <div class="preview-meta">
+        <span id="resolutionLabel">1080 × 2400 px • Safe-Zone Verified</span>
+        <span id="liveTickLabel">Live Countdown</span>
+      </div>
+      <div class="canvas-stage" id="canvasStage">
+        <canvas id="lockCanvas"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
