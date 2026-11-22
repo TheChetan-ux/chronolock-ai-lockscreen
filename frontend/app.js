@@ -101,7 +101,7 @@ const el = {
 };
 
 function setStatus(msg) {
-  el.statusMsg.textContent = msg;
+  if (el.statusMsg) el.statusMsg.textContent = msg;
 }
 
 function getStoredEditToken(slug) {
@@ -131,7 +131,17 @@ function computeRemaining(targetIso) {
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + w, y, x + w, y + h, radius);
+    ctx.arcTo(x + w, y + h, x, y + h, radius);
+    ctx.arcTo(x, y + h, x, y, radius);
+    ctx.arcTo(x, y, x + w, y, radius);
+    ctx.closePath();
+  }
 }
 
 function renderLockScreen(targetCanvas, width, height, includeOverlay) {
@@ -141,14 +151,12 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
   const theme = THEMES[state.themeId] || THEMES['obsidian-gold'];
   const isMobile = height > width;
 
-  // Background gradient
   const grad = ctx.createLinearGradient(0, 0, width * 0.35, height);
   grad.addColorStop(0, theme.bgTop);
   grad.addColorStop(1, theme.bgBottom);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Subtle ambient glow
   const radial = ctx.createRadialGradient(
     width * 0.5,
     isMobile ? height * 0.42 : height * 0.35,
@@ -162,12 +170,10 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
   ctx.fillStyle = radial;
   ctx.fillRect(0, 0, width, height);
 
-  // Safe-zone layout math (leaves top 29% open for Mobile OS Clock/Widgets)
   const padX = isMobile ? 84 : 180;
   const contentW = width - padX * 2;
   let cursorY = isMobile ? Math.round(height * 0.31) : Math.round(height * 0.16);
 
-  // Target Date Eyebrow
   const targetDateObj = new Date(state.targetIso);
   const formattedTarget = Number.isNaN(targetDateObj.getTime())
     ? 'TARGET DEADLINE'
@@ -179,17 +185,15 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
       }).toUpperCase();
 
   ctx.fillStyle = theme.accent;
-  ctx.font = `700 ${isMobile ? 28 : 26}px "JetBrains Mono", monospace`;
+  ctx.font = `700 ${isMobile ? 28 : 26}px monospace`;
   ctx.textAlign = 'left';
   ctx.fillText(`DEADLINE // ${formattedTarget}`, padX, cursorY);
 
-  // Deadline Title
   cursorY += isMobile ? 64 : 58;
   ctx.fillStyle = theme.text;
-  ctx.font = `800 ${isMobile ? 58 : 56}px "Inter", sans-serif`;
+  ctx.font = `800 ${isMobile ? 58 : 56}px sans-serif`;
   ctx.fillText(state.title.slice(0, 44), padX, cursorY);
 
-  // Countdown Hero Block
   cursorY += isMobile ? 54 : 46;
   const cardH = isMobile ? 250 : 210;
   ctx.fillStyle = theme.card;
@@ -211,15 +215,14 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
     const cx = padX + colW * i + colW / 2;
     ctx.textAlign = 'center';
     ctx.fillStyle = i === 0 ? theme.accent : theme.text;
-    ctx.font = `800 ${isMobile ? 104 : 92}px "JetBrains Mono", monospace`;
+    ctx.font = `800 ${isMobile ? 104 : 92}px monospace`;
     ctx.fillText(u.val, cx, cursorY + (isMobile ? 142 : 122));
 
     ctx.fillStyle = theme.muted;
-    ctx.font = `600 ${isMobile ? 24 : 20}px "JetBrains Mono", monospace`;
+    ctx.font = `600 ${isMobile ? 24 : 20}px monospace`;
     ctx.fillText(u.lbl, cx, cursorY + (isMobile ? 196 : 168));
   });
 
-  // Progress Bar
   cursorY += cardH + (isMobile ? 52 : 42);
   const totalM = Math.max(1, state.milestones.length);
   const doneM = state.milestones.filter((m) => m.done).length;
@@ -227,7 +230,7 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
 
   ctx.textAlign = 'left';
   ctx.fillStyle = theme.muted;
-  ctx.font = `600 ${isMobile ? 26 : 22}px "JetBrains Mono", monospace`;
+  ctx.font = `600 ${isMobile ? 26 : 22}px monospace`;
   ctx.fillText(`MILESTONE ROADMAP (${doneM}/${totalM})`, padX, cursorY);
 
   ctx.textAlign = 'right';
@@ -245,7 +248,6 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
     ctx.fill();
   }
 
-  // Chronological Milestones List
   cursorY += isMobile ? 42 : 34;
   const rowH = isMobile ? 112 : 84;
   const rowGap = isMobile ? 20 : 14;
@@ -258,7 +260,6 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
     ctx.fill();
     ctx.stroke();
 
-    // Checkbox Indicator
     const boxSize = isMobile ? 34 : 28;
     const boxX = padX + 28;
     const boxY = cursorY + (rowH - boxSize) / 2;
@@ -281,30 +282,26 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
       ctx.stroke();
     }
 
-    // Milestone Label
     ctx.textAlign = 'left';
     ctx.fillStyle = m.done ? theme.done : theme.text;
-    ctx.font = `${m.done ? '500' : '600'} ${isMobile ? 32 : 26}px "Inter", sans-serif`;
+    ctx.font = `${m.done ? '500' : '600'} ${isMobile ? 32 : 26}px sans-serif`;
     const textY = cursorY + rowH / 2 + (isMobile ? 11 : 9);
     ctx.fillText(m.label.slice(0, 38), boxX + boxSize + 24, textY);
 
-    // Due Offset Pill
     ctx.textAlign = 'right';
     ctx.fillStyle = m.done ? theme.done : theme.accent;
-    ctx.font = `600 ${isMobile ? 24 : 20}px "JetBrains Mono", monospace`;
+    ctx.font = `600 ${isMobile ? 24 : 20}px monospace`;
     ctx.fillText(m.dueOffsetLabel.slice(0, 14), padX + contentW - 28, textY);
 
     cursorY += rowH + rowGap;
   });
 
-  // Footer Micro-Mantra (Leaves bottom 11% free for OS Flashlight/Camera/Dock)
   const footerY = isMobile ? height - 290 : height - 95;
   ctx.textAlign = 'center';
   ctx.fillStyle = theme.muted;
-  ctx.font = `500 ${isMobile ? 28 : 24}px "Inter", sans-serif`;
+  ctx.font = `500 ${isMobile ? 28 : 24}px sans-serif`;
   ctx.fillText(`“${state.mantra}”`, width / 2, footerY);
 
-  // Simulated OS Lock Screen Clock Overlay (Preview only, never exported)
   if (includeOverlay) {
     ctx.save();
     ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
@@ -319,11 +316,11 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
       ctx.setLineDash([]);
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.font = '600 32px "Inter", sans-serif';
+      ctx.font = '600 32px sans-serif';
       ctx.fillText('Saturday, November 22', width / 2, 240);
-      ctx.font = '800 185px "Inter", sans-serif';
+      ctx.font = '800 185px sans-serif';
       ctx.fillText('09:41', width / 2, 435);
-      ctx.font = '600 22px "JetBrains Mono", monospace';
+      ctx.font = '600 22px monospace';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.fillText('OS LOCK SCREEN CLOCK SAFE-ZONE (HIDDEN ON EXPORT)', width / 2, 540);
     } else {
@@ -333,9 +330,9 @@ function renderLockScreen(targetCanvas, width, height, includeOverlay) {
       ctx.setLineDash([]);
       ctx.textAlign = 'left';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.font = '800 110px "Inter", sans-serif';
+      ctx.font = '800 110px sans-serif';
       ctx.fillText('09:41', 160, height - 210);
-      ctx.font = '600 24px "Inter", sans-serif';
+      ctx.font = '600 24px sans-serif';
       ctx.fillText('OS Desktop Clock Safe-Zone (Hidden on Export)', 160, height - 155);
     }
     ctx.restore();
@@ -610,7 +607,6 @@ function bindEvents() {
     window.location.href = '/';
   });
 
-  // Export Clean Native Lock Screen PNG
   el.downloadWallpaperBtn.addEventListener('click', () => {
     const isMobile = state.deviceType === 'mobile';
     const exportCanvas = document.createElement('canvas');
@@ -623,7 +619,6 @@ function bindEvents() {
     setStatus('Exported clean HiDPI lock screen PNG.');
   });
 
-  // Export 1600x900 Showcase Cover Image for Handshake Submission
   el.downloadCoverBtn.addEventListener('click', () => {
     const cover = document.createElement('canvas');
     cover.width = 1600;
@@ -633,7 +628,6 @@ function bindEvents() {
     ctx.fillStyle = '#09090B';
     ctx.fillRect(0, 0, 1600, 900);
 
-    // Render crisp phone lock screen mockup on the right
     const phoneCanvas = document.createElement('canvas');
     renderLockScreen(phoneCanvas, 1080, 2400, true);
 
@@ -651,18 +645,17 @@ function bindEvents() {
     ctx.drawImage(phoneCanvas, mockX, mockY, mockW, mockH);
     ctx.restore();
 
-    // Left Typography Pitch
     ctx.fillStyle = '#F59E0B';
-    ctx.font = '700 22px "JetBrains Mono", monospace';
+    ctx.font = '700 22px monospace';
     ctx.fillText('CHRONOLOCK // GEMINI AI LOCK SCREEN ARCHITECT', 100, 230);
 
     ctx.fillStyle = '#F8FAFC';
-    ctx.font = '800 66px "Inter", sans-serif';
+    ctx.font = '800 66px sans-serif';
     ctx.fillText('Your Deadline,', 100, 325);
     ctx.fillText('Your Design.', 100, 405);
 
     ctx.fillStyle = '#A1A1AA';
-    ctx.font = '500 28px "Inter", sans-serif';
+    ctx.font = '500 28px sans-serif';
     ctx.fillText('Backward-mapped Gemini milestones engineered', 100, 490);
     ctx.fillText('around native OS lock screen clock safe-zones.', 100, 534);
 
@@ -670,7 +663,7 @@ function bindEvents() {
     roundRect(ctx, 100, 610, 860, 110, 18);
     ctx.fill();
     ctx.fillStyle = '#F8FAFC';
-    ctx.font = '700 24px "JetBrains Mono", monospace';
+    ctx.font = '700 24px monospace';
     ctx.fillText(`ACTIVE GOAL: ${state.title.slice(0, 34)}`, 132, 658);
     ctx.fillStyle = '#F59E0B';
     ctx.fillText(`THEME: ${state.themeId.toUpperCase()} • 1080×2400 & 2560×1440`, 132, 696);
@@ -690,20 +683,24 @@ function syncThemePills() {
 }
 
 async function init() {
-  await loadSharedDesignIfPresent();
-  el.titleInput.value = state.title;
-  el.targetDateInput.value = state.targetIso;
-  el.deviceSelect.value = state.deviceType;
-  el.mantraInput.value = state.mantra;
-  el.overlayToggle.checked = state.showOverlay;
+  try {
+    await loadSharedDesignIfPresent();
+    el.titleInput.value = state.title;
+    el.targetDateInput.value = state.targetIso;
+    el.deviceSelect.value = state.deviceType;
+    el.mantraInput.value = state.mantra;
+    el.overlayToggle.checked = state.showOverlay;
 
-  syncThemePills();
-  renderMilestonesEditor();
-  bindEvents();
-  redrawPreview();
-  await checkHealth();
+    syncThemePills();
+    renderMilestonesEditor();
+    bindEvents();
+    redrawPreview();
+    await checkHealth();
 
-  setInterval(redrawPreview, 1000);
+    setInterval(redrawPreview, 1000);
+  } catch (err) {
+    setStatus(`UI Error: ${err.message}`);
+  }
 }
 
 init();
