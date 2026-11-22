@@ -29,13 +29,9 @@ const frontendDir = path.resolve(__dirname, '../frontend');
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-if (process.env.TRUST_PROXY === '1') {
-  app.set('trust proxy', 1);
-}
-
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-// 1. Strict HTTP Security Headers & Content Security Policy
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -58,26 +54,32 @@ app.use(
   })
 );
 
-// 2. Origin Lock
-const allowedOrigin = process.env.ALLOWED_ORIGIN || `http://localhost:${PORT}`;
-app.use(
+// Allow same-origin deployment requests + explicit ALLOWED_ORIGIN
+const configuredOrigin = (process.env.ALLOWED_ORIGIN || '').replace(/\/$/, '');
+app.use((req, res, next) => {
+  const host = req.get('host');
+  const proto = req.get('x-forwarded-proto') || req.protocol;
+  const selfOrigin = host ? `${proto}://${host}` : '';
+
   cors({
     origin(origin, callback) {
-      if (!origin || origin === allowedOrigin) return callback(null, true);
+      if (!origin) return callback(null, true);
+      const cleanOrigin = origin.replace(/\/$/, '');
+      if (cleanOrigin === selfOrigin || (configuredOrigin && cleanOrigin === configuredOrigin)) {
+        return callback(null, true);
+      }
       return callback(new Error('Origin not allowed by CORS'));
     },
     methods: ['GET', 'POST', 'PATCH'],
     allowedHeaders: ['Content-Type', 'X-Edit-Token']
-  })
-);
+  })(req, res, next);
+});
 
-// 3. Strict Payload Cap (16 KB prevents memory exhaustion)
 app.use(express.json({ limit: '16kb', strict: true }));
 
-// 4. Sliding-Window Rate Limiters
 const aiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many AI generation requests. Please wait a few minutes.' }
@@ -91,7 +93,6 @@ const writeLimiter = rateLimit({
   message: { error: 'Rate limit exceeded. Try again shortly.' }
 });
 
-// Health Check
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
@@ -102,7 +103,6 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// AI Milestone & Theme Generation Endpoint
 app.post('/api/generate', aiLimiter, async (req, res, next) => {
   try {
     const parsed = GeneratePlanSchema.safeParse(req.body);
@@ -117,7 +117,6 @@ app.post('/api/generate', aiLimiter, async (req, res, next) => {
   }
 });
 
-// Save & Publish Shareable Lock Screen
 app.post('/api/designs', writeLimiter, (req, res, next) => {
   try {
     const parsed = SaveDesignSchema.safeParse(req.body);
@@ -154,7 +153,6 @@ app.post('/api/designs', writeLimiter, (req, res, next) => {
   }
 });
 
-// Fetch Public Read-Only Lock Screen by Slug
 app.get('/api/designs/:slug', (req, res) => {
   const slugCheck = SlugParamSchema.safeParse(req.params.slug);
   if (!slugCheck.success) {
@@ -166,7 +164,6 @@ app.get('/api/designs/:slug', (req, res) => {
     return res.status(404).json({ error: 'Lock screen design not found.' });
   }
 
-  // Never return editTokenHash to clients
   return res.json({
     slug: record.slug,
     title: record.title,
@@ -179,7 +176,6 @@ app.get('/api/designs/:slug', (req, res) => {
   });
 });
 
-// Update Milestone Checkboxes (Requires Cryptographic X-Edit-Token)
 app.patch('/api/designs/:slug/milestones', writeLimiter, (req, res) => {
   const slugCheck = SlugParamSchema.safeParse(req.params.slug);
   if (!slugCheck.success) {
@@ -212,15 +208,12 @@ app.patch('/api/designs/:slug/milestones', writeLimiter, (req, res) => {
   return res.json({ ok: true, milestones: normalized });
 });
 
-// Serve Static Frontend Assets
-app.use(express.static(frontendDir, { maxAge: '1h' }));
+app.use(express.static(frontendDir, { maxAge: 0 }));
 
-// SPA Route for Shared Permalinks (/d/:slug)
 app.get('/d/:slug', (_req, res) => {
   res.sendFile(path.join(frontendDir, 'index.html'));
 });
 
-// Global Error Handler (Zero Stack-Trace Exposure)
 app.use((err, _req, res, _next) => {
   const errorId = crypto.randomBytes(6).toString('hex');
   console.error(`[Error ${errorId}]`, err.message);

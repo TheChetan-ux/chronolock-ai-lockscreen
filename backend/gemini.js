@@ -12,7 +12,7 @@ Rules:
 5. Select the single most fitting themeId from: obsidian-gold, nordic-paper, cyber-emerald, sunset-terracotta, deep-cobalt.
 `.trim();
 
-function buildHeuristicFallback(title, targetIso) {
+function buildHeuristicFallback(title, targetIso, reason = '') {
   const target = new Date(targetIso);
   const now = new Date();
   const totalDays = Math.max(1, Math.ceil((target - now) / (1000 * 60 * 60 * 24)));
@@ -24,7 +24,7 @@ function buildHeuristicFallback(title, targetIso) {
   };
 
   return {
-    source: 'local-fallback',
+    source: reason ? `local-fallback (${reason})` : 'local-fallback',
     mantra: 'Small daily blocks compound into completion.',
     themeId: 'obsidian-gold',
     milestones: [
@@ -40,7 +40,7 @@ function buildHeuristicFallback(title, targetIso) {
 export async function generateLockscreenPlan({ title, targetIso, context }) {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || apiKey === 'paste_your_google_ai_studio_api_key_here') {
-    return buildHeuristicFallback(title, targetIso);
+    return buildHeuristicFallback(title, targetIso, 'missing GEMINI_API_KEY');
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -55,10 +55,11 @@ export async function generateLockscreenPlan({ title, targetIso, context }) {
 
   const prompt = `Generate a lock screen milestone plan for this goal payload:\n<goal_data>\n${untrustedPayload}\n</goal_data>`;
 
+  const envModel = process.env.GEMINI_MODEL?.trim();
   const candidateModels = [
-    process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-2.5-flash'
+    ...(envModel && !envModel.includes('3.5') ? [envModel] : []),
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite'
   ];
 
   let lastError = null;
@@ -121,6 +122,7 @@ export async function generateLockscreenPlan({ title, targetIso, context }) {
     }
   }
 
-  console.error('[Gemini Fallback Triggered]:', lastError?.message || 'Unknown error');
-  return buildHeuristicFallback(title, targetIso);
+  const shortErr = (lastError?.message || 'API error').slice(0, 80);
+  console.error('[Gemini Fallback Triggered]:', shortErr);
+  return buildHeuristicFallback(title, targetIso, shortErr);
 }
